@@ -1,0 +1,297 @@
+{% extends 'base.html' %}
+
+{% block title %}Аналітика команди - TaskManager{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stats-card {
+        border-left: 4px solid;
+        height: 100%;
+    }
+    .stats-card-primary {
+        border-color: var(--bs-primary);
+    }
+    .stats-card-success {
+        border-color: var(--bs-success);
+    }
+    .stats-card-warning {
+        border-color: var(--bs-warning);
+    }
+    .stats-card-info {
+        border-color: var(--bs-info);
+    }
+    .chart-container {
+        position: relative;
+        height: 300px;
+        margin-bottom: 20px;
+    }
+    .productivity-table th,
+    .productivity-table td {
+        vertical-align: middle;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-sm-flex align-items-center justify-content-between mb-4">
+    <h1 class="h3 mb-0 text-gray-800">Аналітика команди</h1>
+</div>
+
+<!-- Filters -->
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Фільтри</h6>
+    </div>
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-5">
+                <label for="project" class="form-label">Проект</label>
+                <select name="project" id="project" class="form-select">
+                    <option value="all" {% if selected_project_id == 'all' %}selected{% endif %}>Всі проекти</option>
+                    {% for project in projects %}
+                    <option value="{{ project.id }}" {% if selected_project_id == project.id|stringformat:"s" %}selected{% endif %}>
+                        {{ project.title }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-5">
+                <label for="time_range" class="form-label">Часовий діапазон</label>
+                <select name="time_range" id="time_range" class="form-select">
+                    <option value="7" {% if time_range == '7' %}selected{% endif %}>Останні 7 днів</option>
+                    <option value="30" {% if time_range == '30' %}selected{% endif %}>Останні 30 днів</option>
+                    <option value="90" {% if time_range == '90' %}selected{% endif %}>Останні 90 днів</option>
+                    <option value="365" {% if time_range == '365' %}selected{% endif %}>Останній рік</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100">Застосувати</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Stats Overview -->
+<div class="row mb-4">
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card shadow stats-card stats-card-primary h-100">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-3 text-center text-primary">
+                        <i class="fas fa-clipboard-list fa-3x"></i>
+                    </div>
+                    <div class="col-9">
+                        <div class="text-xs font-weight-bold text-uppercase mb-1">Створено завдань</div>
+                        <div class="h5 mb-0 font-weight-bold">{{ total_created }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card shadow stats-card stats-card-success h-100">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-3 text-center text-success">
+                        <i class="fas fa-check-circle fa-3x"></i>
+                    </div>
+                    <div class="col-9">
+                        <div class="text-xs font-weight-bold text-uppercase mb-1">Завершено завдань</div>
+                        <div class="h5 mb-0 font-weight-bold">{{ total_completed }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card shadow stats-card stats-card-info h-100">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-3 text-center text-info">
+                        <i class="fas fa-percentage fa-3x"></i>
+                    </div>
+                    <div class="col-9">
+                        <div class="text-xs font-weight-bold text-uppercase mb-1">Рівень завершення</div>
+                        <div class="h5 mb-0 font-weight-bold">{{ completion_rate }}%</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card shadow stats-card stats-card-warning h-100">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-3 text-center text-warning">
+                        <i class="fas fa-exclamation-circle fa-3x"></i>
+                    </div>
+                    <div class="col-9">
+                        <div class="text-xs font-weight-bold text-uppercase mb-1">Прострочені завдання</div>
+                        <div class="h5 mb-0 font-weight-bold">{{ overdue_tasks }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Performance Graphs -->
+<div class="row mb-4">
+    <div class="col-lg-8">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Тренд завершення завдань</h6>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="completionTrendChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Розподіл робочого навантаження</h6>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="workloadChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Team Productivity Table -->
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Продуктивність команди</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover productivity-table">
+                <thead>
+                    <tr>
+                        <th>Користувач</th>
+                        <th>Створено завдань</th>
+                        <th>Завершено завдань</th>
+                        <th>Коментарі</th>
+                        <th>Затрачений час (год)</th>
+                        <th>Ефективність</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in user_productivity %}
+                    <tr>
+                        <td>{{ user.name }}</td>
+                        <td>{{ user.tasks_created }}</td>
+                        <td>{{ user.tasks_completed }}</td>
+                        <td>{{ user.comments }}</td>
+                        <td>{{ user.hours_logged }}</td>
+                        <td>
+                            {% if user.tasks_created > 0 %}
+                                {% with efficiency=user.tasks_completed|floatformat:0|default:0 %}
+                                <div class="d-flex align-items-center">
+                                    <div class="progress flex-grow-1 me-2" style="height: 8px;">
+                                        <div class="progress-bar 
+                                            {% if efficiency < 25 %}bg-danger
+                                            {% elif efficiency < 50 %}bg-warning
+                                            {% elif efficiency < 75 %}bg-info
+                                            {% else %}bg-success{% endif %}" 
+                                            role="progressbar" style="width: {{ efficiency }}%" 
+                                            aria-valuenow="{{ efficiency }}" aria-valuemin="0" aria-valuemax="100">
+                                        </div>
+                                    </div>
+                                    <span>{{ efficiency }}%</span>
+                                </div>
+                                {% endwith %}
+                            {% else %}
+                                <span class="text-muted">Немає даних</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center">Немає даних про активність</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    // Completion Trend Chart
+    const trendCtx = document.getElementById('completionTrendChart').getContext('2d');
+    const trendChart = new Chart(trendCtx, {
+        type: 'line',
+        data: {
+            labels: {{ trend_dates|safe }},
+            datasets: [{
+                label: 'Завершені завдання',
+                data: {{ trend_counts|safe }},
+                borderColor: '#4e73df',
+                backgroundColor: 'rgba(78, 115, 223, 0.05)',
+                borderWidth: 2,
+                fill: true,
+                tension: 0.1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    grid: {
+                        display: false
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        precision: 0
+                    }
+                }
+            }
+        }
+    });
+    
+    // Workload Chart
+    const workloadCtx = document.getElementById('workloadChart').getContext('2d');
+    const workloadChart = new Chart(workloadCtx, {
+        type: 'bar',
+        data: {
+            labels: {{ workload_labels|safe }},
+            datasets: [{
+                label: 'Активні завдання',
+                data: {{ workload_counts|safe }},
+                backgroundColor: '#36b9cc',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: 'y',
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    ticks: {
+                        precision: 0
+                    }
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}
