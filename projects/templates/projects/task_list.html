@@ -1,0 +1,170 @@
+{% extends 'base.html' %}
+
+{% block title %}Мої завдання - TaskManager{% endblock %}
+
+{% block content %}
+<div class="d-sm-flex align-items-center justify-content-between mb-4">
+    <h1 class="h3 mb-0 text-gray-800">Мої завдання</h1>
+    <a href="{% url 'task-create' %}" class="d-none d-sm-inline-block btn btn-success shadow-sm">
+        <i class="fas fa-plus fa-sm text-white-50 me-1"></i> Створити нове завдання
+    </a>
+</div>
+
+<!-- Filters -->
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">
+            <i class="fas fa-filter me-1"></i> Фільтри
+        </h6>
+    </div>
+    <div class="card-body">
+        <form method="get" class="form-inline">
+            <div class="row">
+                <div class="col-md-3 mb-2">
+                    <label for="status-filter" class="form-label">Статус</label>
+                    <select name="status" id="status-filter" class="form-select">
+                        <option value="all" {% if status_filter == 'all' %}selected{% endif %}>Всі статуси</option>
+                        <option value="todo" {% if status_filter == 'todo' %}selected{% endif %}>Зробити</option>
+                        <option value="in_progress" {% if status_filter == 'in_progress' %}selected{% endif %}>В процесі</option>
+                        <option value="review" {% if status_filter == 'review' %}selected{% endif %}>На перевірці</option>
+                        <option value="completed" {% if status_filter == 'completed' %}selected{% endif %}>Завершено</option>
+                    </select>
+                </div>
+                <div class="col-md-3 mb-2">
+                    <label for="priority-filter" class="form-label">Пріоритет</label>
+                    <select name="priority" id="priority-filter" class="form-select">
+                        <option value="all" {% if priority_filter == 'all' %}selected{% endif %}>Всі пріоритети</option>
+                        <option value="low" {% if priority_filter == 'low' %}selected{% endif %}>Низький</option>
+                        <option value="medium" {% if priority_filter == 'medium' %}selected{% endif %}>Середній</option>
+                        <option value="high" {% if priority_filter == 'high' %}selected{% endif %}>Високий</option>
+                        <option value="urgent" {% if priority_filter == 'urgent' %}selected{% endif %}>Терміново</option>
+                    </select>
+                </div>
+                <div class="col-md-3 mb-2">
+                    <label for="project-filter" class="form-label">Проект</label>
+                    <select name="project" id="project-filter" class="form-select">
+                        <option value="all" {% if project_filter == 'all' %}selected{% endif %}>Всі проекти</option>
+                        {% for project in projects %}
+                        <option value="{{ project.id }}" {% if project_filter == project.id|stringformat:"s" %}selected{% endif %}>
+                            {{ project.title }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3 mb-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary me-2">Застосувати</button>
+                    <a href="{% url 'task-list' %}" class="btn btn-secondary">Скинути</a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if tasks %}
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">
+            <i class="fas fa-list me-1"></i> Список завдань
+        </h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Назва</th>
+                        <th>Проект</th>
+                        <th>Статус</th>
+                        <th>Пріоритет</th>
+                        <th>Виконавець</th>
+                        <th>Термін</th>
+                        <th>Дії</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for task in tasks %}
+                    <tr>
+                        <td>
+                            <a href="{% url 'task-detail' task.id %}" class="text-primary fw-bold">{{ task.title }}</a>
+                            {% if task.parent_task %}
+                                <small class="text-muted d-block">
+                                    <i class="fas fa-sitemap me-1"></i> Підзавдання
+                                </small>
+                            {% endif %}
+                        </td>
+                        <td><a href="{% url 'project-detail' task.project.id %}">{{ task.project.title }}</a></td>
+                        <td>
+                            <span class="badge 
+                                {% if task.status == 'todo' %}bg-secondary{% endif %}
+                                {% if task.status == 'in_progress' %}bg-primary{% endif %}
+                                {% if task.status == 'review' %}bg-warning{% endif %}
+                                {% if task.status == 'completed' %}bg-success{% endif %}">
+                                {{ task.get_status_display }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge 
+                                {% if task.priority == 'low' %}bg-success{% endif %}
+                                {% if task.priority == 'medium' %}bg-info{% endif %}
+                                {% if task.priority == 'high' %}bg-warning{% endif %}
+                                {% if task.priority == 'urgent' %}bg-danger{% endif %}">
+                                {{ task.get_priority_display }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if task.assignee %}
+                                {{ task.assignee.get_full_name|default:task.assignee.username }}
+                            {% else %}
+                                <span class="text-muted">Не призначено</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if task.due_date %}
+                                {{ task.due_date|date:"d.m.Y" }}
+                                {% if task.is_overdue %}<i class="fas fa-exclamation-circle text-danger ms-1" title="Прострочено"></i>{% endif %}
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group">
+                                <a href="{% url 'task-detail' task.id %}" class="btn btn-sm btn-outline-primary" title="Переглянути">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                {% if user == task.assignee or user == task.project.owner or user == task.created_by %}
+                                <a href="{% url 'task-update' task.id %}" class="btn btn-sm btn-outline-info" title="Редагувати">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                {% endif %}
+                                {% if user == task.project.owner or user == task.created_by %}
+                                <a href="{% url 'task-delete' task.id %}" class="btn btn-sm btn-outline-danger" title="Видалити">
+                                    <i class="fas fa-trash"></i>
+                                </a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% include 'pagination.html' %}
+
+{% else %}
+<div class="card shadow mb-4">
+    <div class="card-body text-center py-5">
+        <div class="text-gray-500 mb-3">
+            <i class="fas fa-tasks fa-4x mb-3"></i>
+            <h4>У вас ще немає завдань</h4>
+            <p class="mb-4">Створіть своє перше завдання або попросіть колег додати вас до їхніх проектів</p>
+            <a href="{% url 'task-create' %}" class="btn btn-success">
+                <i class="fas fa-plus me-1"></i> Створити нове завдання
+            </a>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
