@@ -1,0 +1,391 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}{{ task.title }} - TaskManager{% endblock %}
+
+{% block content %}
+<div class="d-sm-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h1 class="h3 mb-0 text-gray-800">{{ task.title }}</h1>
+        <p class="text-muted mb-0">
+            <a href="{% url 'project-detail' task.project.id %}">{{ task.project.title }}</a> / Завдання
+        </p>
+    </div>
+    <div>
+        {% if user == task.assignee or user == task.project.owner or user == task.created_by %}
+        <a href="{% url 'task-update' task.id %}" class="btn btn-primary shadow-sm me-2">
+            <i class="fas fa-edit fa-sm text-white-50 me-1"></i> Редагувати
+        </a>
+        {% endif %}
+        {% if user == task.project.owner or user == task.created_by %}
+        <a href="{% url 'task-delete' task.id %}" class="btn btn-danger shadow-sm">
+            <i class="fas fa-trash fa-sm text-white-50 me-1"></i> Видалити
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <!-- Task Details Card -->
+        <div class="card shadow mb-4">
+            <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                <h6 class="m-0 font-weight-bold text-primary">
+                    <i class="fas fa-info-circle me-1"></i> Інформація про завдання
+                </h6>
+                <span class="badge 
+                    {% if task.status == 'todo' %}bg-secondary{% endif %}
+                    {% if task.status == 'in_progress' %}bg-primary{% endif %}
+                    {% if task.status == 'review' %}bg-warning{% endif %}
+                    {% if task.status == 'completed' %}bg-success{% endif %}">
+                    {{ task.get_status_display }}
+                </span>
+            </div>
+            <div class="card-body">
+                <h5>Опис</h5>
+                <p>{{ task.description|linebreaks }}</p>
+                
+                <div class="row mt-4">
+                    <div class="col-md-6">
+                        <h5>Деталі</h5>
+                        <table class="table table-borderless table-sm">
+                            <tr>
+                                <th style="width: 40%">Пріоритет:</th>
+                                <td>
+                                    <span class="badge 
+                                        {% if task.priority == 'low' %}bg-success{% endif %}
+                                        {% if task.priority == 'medium' %}bg-info{% endif %}
+                                        {% if task.priority == 'high' %}bg-warning{% endif %}
+                                        {% if task.priority == 'urgent' %}bg-danger{% endif %}">
+                                        {{ task.get_priority_display }}
+                                    </span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Проект:</th>
+                                <td><a href="{% url 'project-detail' task.project.id %}">{{ task.project.title }}</a></td>
+                            </tr>
+                            {% if task.parent_task %}
+                            <tr>
+                                <th>Батьківське завдання:</th>
+                                <td><a href="{% url 'task-detail' task.parent_task.id %}">{{ task.parent_task.title }}</a></td>
+                            </tr>
+                            {% endif %}
+                            <tr>
+                                <th>Виконавець:</th>
+                                <td>{{ task.assignee.get_full_name|default:task.assignee.username }}</td>
+                            </tr>
+                            <tr>
+                                <th>Створив:</th>
+                                <td>{{ task.created_by.get_full_name|default:task.created_by.username }}</td>
+                            </tr>
+                            {% if task.due_date %}
+                            <tr>
+                                <th>Термін виконання:</th>
+                                <td>
+                                    {{ task.due_date|date:"d.m.Y" }}
+                                    {% if task.is_overdue %}<span class="badge bg-danger ms-2">Прострочено</span>{% endif %}
+                                </td>
+                            </tr>
+                            {% endif %}
+                            <tr>
+                                <th>Створено:</th>
+                                <td>{{ task.created_at|date:"d.m.Y H:i" }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <h5>Час</h5>
+                        <table class="table table-borderless table-sm">
+                            <tr>
+                                <th style="width: 50%">Оцінка часу:</th>
+                                <td>{% if task.estimated_hours %}{{ task.estimated_hours }} годин{% else %}Не вказано{% endif %}</td>
+                            </tr>
+                            <tr>
+                                <th>Фактичний час:</th>
+                                <td>{% if task.actual_hours %}{{ task.actual_hours }} годин{% else %}Не вказано{% endif %}</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- Quick Update Form -->
+                {% if user == task.assignee or user == task.project.owner %}
+                <div class="card mt-4">
+                    <div class="card-header py-2 bg-light">
+                        <h6 class="mb-0">Швидке оновлення</h6>
+                    </div>
+                    <div class="card-body">
+                        <form method="post" action="{% url 'update-task-status' task.id %}">
+                            {% csrf_token %}
+                            <div class="row">
+                                <div class="col-md-6">
+                                    {{ update_form.status|as_crispy_field }}
+                                </div>
+                                <div class="col-md-4">
+                                    {{ update_form.actual_hours|as_crispy_field }}
+                                </div>
+                                <div class="col-md-2 d-flex align-items-end">
+                                    <button type="submit" class="btn btn-primary w-100">Оновити</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Subtasks Card -->
+        {% if subtasks %}
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">
+                    <i class="fas fa-tasks me-1"></i> Підзавдання ({{ subtasks.count }})
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Назва</th>
+                                <th>Статус</th>
+                                <th>Пріоритет</th>
+                                <th>Виконавець</th>
+                                <th>Термін</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for subtask in subtasks %}
+                            <tr onclick="location.href='{% url 'task-detail' subtask.id %}'" style="cursor: pointer">
+                                <td>{{ subtask.title }}</td>
+                                <td>
+                                    <span class="badge 
+                                        {% if subtask.status == 'todo' %}bg-secondary{% endif %}
+                                        {% if subtask.status == 'in_progress' %}bg-primary{% endif %}
+                                        {% if subtask.status == 'review' %}bg-warning{% endif %}
+                                        {% if subtask.status == 'completed' %}bg-success{% endif %}">
+                                        {{ subtask.get_status_display }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge 
+                                        {% if subtask.priority == 'low' %}bg-success{% endif %}
+                                        {% if subtask.priority == 'medium' %}bg-info{% endif %}
+                                        {% if subtask.priority == 'high' %}bg-warning{% endif %}
+                                        {% if subtask.priority == 'urgent' %}bg-danger{% endif %}">
+                                        {{ subtask.get_priority_display }}
+                                    </span>
+                                </td>
+                                <td>{{ subtask.assignee.get_full_name|default:subtask.assignee.username }}</td>
+                                <td>
+                                    {% if subtask.due_date %}
+                                    {{ subtask.due_date|date:"d.m.Y" }}
+                                    {% if subtask.is_overdue %}<i class="fas fa-exclamation-circle text-danger ms-1"></i>{% endif %}
+                                    {% else %}
+                                    -
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Comments Card -->
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">
+                    <i class="fas fa-comments me-1"></i> Коментарі ({{ comments.count }})
+                </h6>
+            </div>
+            <div class="card-body">
+                <!-- Comment Form -->
+                <form method="post" action="{% url 'add-comment' task.id %}">
+                    {% csrf_token %}
+                    {{ comment_form|crispy }}
+                    <button type="submit" class="btn btn-primary">Додати коментар</button>
+                </form>
+                
+                <hr>
+                
+                <!-- Comments List -->
+                {% for comment in comments %}
+                <div class="d-flex mb-4">
+                    <div class="flex-shrink-0">
+                        {% if comment.author.profile.avatar %}
+                        <img src="{{ comment.author.profile.avatar.url }}" alt="Avatar" class="rounded-circle" width="50">
+                        {% else %}
+                        <div class="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                            {{ comment.author.username|first|upper }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="ms-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0">{{ comment.author.get_full_name|default:comment.author.username }}</h6>
+                            <small class="text-muted">{{ comment.created_at|date:"d.m.Y H:i" }}</small>
+                        </div>
+                        <p class="my-2">{{ comment.text|linebreaks }}</p>
+                    </div>
+                </div>
+                {% empty %}
+                <p class="text-muted">Поки немає коментарів. Будьте першим, хто залишить коментар!</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <!-- Task History Card -->
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">
+                    <i class="fas fa-history me-1"></i> Історія змін
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="timeline">
+                    {% for history in task_history %}
+                    <div class="timeline-item">
+                        <div class="timeline-marker bg-primary"></div>
+                        <div class="timeline-content">
+                            <h6 class="mb-0">{{ history.changed_field }}</h6>
+                            <div class="d-flex justify-content-between">
+                                <small>{{ history.user.get_full_name|default:history.user.username }}</small>
+                                <small class="text-muted">{{ history.timestamp|date:"d.m.Y H:i" }}</small>
+                            </div>
+                            <div class="mt-2 small">
+                                {% if history.old_value %}
+                                <div class="text-danger"><del>{{ history.old_value }}</del></div>
+                                {% endif %}
+                                {% if history.new_value %}
+                                <div class="text-success">{{ history.new_value }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <p class="text-muted">Історія змін відсутня</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Files Card -->
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">
+                    <i class="fas fa-file-alt me-1"></i> Пов'язані файли
+                </h6>
+            </div>
+            <div class="card-body">
+                <!-- This will be populated when we implement file functionality -->
+                <p class="text-center">
+                    <a href="{% url 'file-upload' %}?task={{ task.id }}" class="btn btn-outline-primary">
+                        <i class="fas fa-upload me-1"></i> Завантажити файл
+                    </a>
+                </p>
+                <div class="list-group mt-3">
+                    <!-- Will be populated with files -->
+                    <p class="text-muted text-center">Немає прикріплених файлів</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Related Tasks Card -->
+        {% if task.parent_task or subtasks %}
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">
+                    <i class="fas fa-sitemap me-1"></i> Зв'язані завдання
+                </h6>
+            </div>
+            <div class="card-body">
+                {% if task.parent_task %}
+                <h6>Батьківське завдання</h6>
+                <div class="list-group mb-3">
+                    <a href="{% url 'task-detail' task.parent_task.id %}" class="list-group-item list-group-item-action">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>{{ task.parent_task.title }}</div>
+                            <span class="badge 
+                                {% if task.parent_task.status == 'todo' %}bg-secondary{% endif %}
+                                {% if task.parent_task.status == 'in_progress' %}bg-primary{% endif %}
+                                {% if task.parent_task.status == 'review' %}bg-warning{% endif %}
+                                {% if task.parent_task.status == 'completed' %}bg-success{% endif %}">
+                                {{ task.parent_task.get_status_display }}
+                            </span>
+                        </div>
+                    </a>
+                </div>
+                {% endif %}
+                
+                {% if subtasks %}
+                <h6>Підзавдання ({{ subtasks.count }})</h6>
+                <div class="list-group">
+                    {% for subtask in subtasks %}
+                    <a href="{% url 'task-detail' subtask.id %}" class="list-group-item list-group-item-action">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>{{ subtask.title }}</div>
+                            <span class="badge 
+                                {% if subtask.status == 'todo' %}bg-secondary{% endif %}
+                                {% if subtask.status == 'in_progress' %}bg-primary{% endif %}
+                                {% if subtask.status == 'review' %}bg-warning{% endif %}
+                                {% if subtask.status == 'completed' %}bg-success{% endif %}">
+                                {{ subtask.get_status_display }}
+                            </span>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Timeline styles */
+    .timeline {
+        position: relative;
+        margin-left: 20px;
+    }
+    
+    .timeline-item {
+        position: relative;
+        margin-bottom: 15px;
+        padding-bottom: 15px;
+        border-bottom: 1px dashed #e3e6f0;
+    }
+    
+    .timeline-item:last-child {
+        border-bottom: none;
+    }
+    
+    .timeline-marker {
+        position: absolute;
+        left: -25px;
+        top: 5px;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+    }
+    
+    .timeline:before {
+        content: '';
+        position: absolute;
+        left: -20px;
+        top: 0;
+        height: 100%;
+        width: 1px;
+        background-color: #e3e6f0;
+    }
+</style>
+{% endblock %}
