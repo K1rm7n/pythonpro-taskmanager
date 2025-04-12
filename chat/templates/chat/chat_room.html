@@ -1,0 +1,488 @@
+{% extends 'base.html' %}
+
+{% block title %}Чат - TaskManager{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Chat container styles */
+    .chat-container {
+        height: calc(100vh - 200px);
+        min-height: 500px;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    /* Sidebar styles */
+    .chat-sidebar {
+        overflow-y: auto;
+        height: 100%;
+    }
+    
+    .chat-room-item {
+        cursor: pointer;
+        border-left: 3px solid transparent;
+        transition: all 0.2s;
+    }
+    
+    .chat-room-item:hover {
+        background-color: rgba(0, 0, 0, 0.03);
+    }
+    
+    .chat-room-item.active {
+        background-color: rgba(13, 110, 253, 0.1);
+        border-left-color: #0d6efd;
+    }
+    
+    .chat-room-item .unread-badge {
+        min-width: 22px;
+    }
+    
+    /* Messages area styles */
+    .chat-messages {
+        overflow-y: auto;
+        flex-grow: 1;
+        padding: 1rem;
+        background-color: #f8f9fa;
+    }
+    
+    .message-item {
+        margin-bottom: 1rem;
+        max-width: 80%;
+    }
+    
+    .message-item.outgoing {
+        margin-left: auto;
+    }
+    
+    .message-content {
+        border-radius: 1rem;
+        padding: 0.75rem 1rem;
+        position: relative;
+    }
+    
+    .message-item.incoming .message-content {
+        background-color: #ffffff;
+        border: 1px solid #e9ecef;
+        border-top-left-radius: 0;
+    }
+    
+    .message-item.outgoing .message-content {
+        background-color: #0d6efd;
+        color: white;
+        border-top-right-radius: 0;
+    }
+    
+    .message-time {
+        font-size: 0.75rem;
+        margin-top: 0.25rem;
+    }
+    
+    .message-item.incoming .message-time {
+        text-align: left;
+    }
+    
+    .message-item.outgoing .message-time {
+        text-align: right;
+    }
+    
+    /* Input area styles */
+    .chat-input {
+        padding: 1rem;
+        border-top: 1px solid #e9ecef;
+    }
+    
+    .mention-highlight {
+        font-weight: bold;
+        color: #0d6efd;
+        background-color: rgba(13, 110, 253, 0.1);
+        padding: 0.1rem 0.3rem;
+        border-radius: 0.25rem;
+    }
+    
+    /* Participants sidebar */
+    .participants-sidebar {
+        border-left: 1px solid #e9ecef;
+        overflow-y: auto;
+        height: 100%;
+    }
+    
+    .participant-item {
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid #e9ecef;
+    }
+    
+    .participant-item:last-child {
+        border-bottom: none;
+    }
+    
+    .participant-avatar {
+        width: 36px;
+        height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        font-weight: bold;
+    }
+    
+    /* Create chat modal */
+    .create-chat-btn {
+        position: absolute;
+        bottom: 1rem;
+        left: 1rem;
+        z-index: 10;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-sm-flex align-items-center justify-content-between mb-4">
+    <h1 class="h3 mb-0 text-gray-800">Командний чат</h1>
+</div>
+
+<!-- Chat Interface -->
+<div class="card shadow mb-4">
+    <div class="card-body p-0">
+        <div class="chat-container">
+            <div class="row g-0 h-100">
+                <!-- Chat Rooms Sidebar -->
+                <div class="col-md-3 col-lg-2 chat-sidebar">
+                    <div class="list-group list-group-flush">
+                        {% for room in rooms %}
+                        <a href="{% url 'chat-room' room.id %}" class="list-group-item list-group-item-action chat-room-item {% if current_room and current_room.id == room.id %}active{% endif %}">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div class="text-truncate">
+                                    {% if room.is_project_room %}
+                                    <i class="fas fa-project-diagram me-2"></i>
+                                    {% else %}
+                                    <i class="fas fa-comments me-2"></i>
+                                    {% endif %}
+                                    {{ room }}
+                                </div>
+                                {% if room.unread_count > 0 %}
+                                <span class="badge bg-danger rounded-pill unread-badge">{{ room.unread_count }}</span>
+                                {% endif %}
+                            </div>
+                        </a>
+                        {% empty %}
+                        <div class="p-3 text-center text-muted">
+                            <p>Немає доступних чат-кімнат</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    
+                    <!-- Create Chat Button -->
+                    <button type="button" class="btn btn-primary btn-sm rounded-circle create-chat-btn" data-bs-toggle="modal" data-bs-target="#createChatModal" title="Створити новий чат">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+                
+                <!-- Main Chat Area -->
+                <div class="col-md-6 col-lg-7 d-flex flex-column">
+                    {% if current_room %}
+                    <!-- Chat Header -->
+                    <div class="px-3 py-2 border-bottom d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="mb-0">{{ current_room }}</h5>
+                            {% if current_room.is_project_room and current_room.project %}
+                            <small class="text-muted">Проект: <a href="{% url 'project-detail' current_room.project.id %}">{{ current_room.project.title }}</a></small>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Mobile toggle for participants -->
+                        <button class="btn btn-sm btn-outline-secondary d-md-none" type="button" data-bs-toggle="collapse" data-bs-target="#participantsCollapse" aria-expanded="false">
+                            <i class="fas fa-users"></i> Учасники
+                        </button>
+                    </div>
+                    
+                    <!-- Chat Messages -->
+                    <div class="chat-messages" id="chatMessages">
+                        <div class="text-center my-3 text-muted small">
+                            <i class="fas fa-spinner fa-spin me-1"></i> Завантаження повідомлень...
+                        </div>
+                        <!-- Messages will be loaded here by JavaScript -->
+                    </div>
+                    
+                    <!-- Chat Input -->
+                    <div class="chat-input">
+                        <form id="chatForm" class="d-flex">
+                            <div class="input-group">
+                                <input type="text" id="messageInput" class="form-control" placeholder="Введіть повідомлення..." autocomplete="off">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-paper-plane"></i>
+                                </button>
+                            </div>
+                        </form>
+                        <small class="form-text text-muted mt-1">
+                            Використовуйте @ім'я для згадки користувача
+                        </small>
+                    </div>
+                    {% else %}
+                    <!-- No Room Selected -->
+                    <div class="d-flex flex-column align-items-center justify-content-center h-100 text-center p-4">
+                        <i class="fas fa-comments fa-4x text-muted mb-3"></i>
+                        <h4>Виберіть чат-кімнату</h4>
+                        <p class="text-muted">Виберіть існуючу кімнату зі списку зліва або створіть нову</p>
+                        <button class="btn btn-primary mt-2" data-bs-toggle="modal" data-bs-target="#createChatModal">
+                            <i class="fas fa-plus me-1"></i> Створити новий чат
+                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <!-- Participants Sidebar (Desktop) -->
+                <div class="col-md-3 col-lg-3 d-none d-md-block participants-sidebar">
+                    <div class="px-3 py-2 border-bottom">
+                        <h6 class="mb-0"><i class="fas fa-users me-1"></i> Учасники</h6>
+                    </div>
+                    <div class="participants-list">
+                        {% if current_room %}
+                            {% for participant in participants %}
+                            <div class="participant-item d-flex align-items-center">
+                                {% if participant.profile.avatar %}
+                                <img src="{{ participant.profile.avatar.url }}" alt="{{ participant.username }}" class="rounded-circle me-2" width="36" height="36">
+                                {% else %}
+                                <div class="participant-avatar bg-secondary text-white me-2">
+                                    {{ participant.username|first|upper }}
+                                </div>
+                                {% endif %}
+                                <div>
+                                    <div class="fw-bold">{{ participant.get_full_name|default:participant.username }}</div>
+                                    <small class="text-muted">@{{ participant.username }}</small>
+                                </div>
+                            </div>
+                            {% empty %}
+                            <div class="p-3 text-center text-muted">
+                                <p>Немає активних учасників</p>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                        <div class="p-3 text-center text-muted">
+                            <p>Виберіть чат-кімнату, щоб побачити учасників</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <!-- Participants Sidebar (Mobile) -->
+                <div class="collapse d-md-none" id="participantsCollapse">
+                    <div class="participants-list">
+                        <!-- Will be populated when mobile toggle is clicked -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create Chat Modal -->
+<div class="modal fade" id="createChatModal" tabindex="-1" aria-labelledby="createChatModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="createChatModalLabel">Створити новий чат</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="post" action="{% url 'create-chat' %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="chatName" class="form-label">Назва чату</label>
+                        <input type="text" class="form-control" id="chatName" name="name" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Скасувати</button>
+                    <button type="submit" class="btn btn-primary">Створити</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if current_room %}
+<script>
+    // Current user info
+    const currentUserId = {{ user.id }};
+    const currentUsername = "{{ user.username }}";
+    
+    // Current room info
+    const roomId = {{ current_room.id }};
+    
+    // WebSocket connection
+    let chatSocket = null;
+    
+    // Connect to WebSocket
+    function connectWebSocket() {
+        // Create WebSocket connection
+        chatSocket = new WebSocket(
+            'ws://' + window.location.host + '/ws/chat/' + roomId + '/'
+        );
+        
+        // Connection opened
+        chatSocket.onopen = function(e) {
+            console.log('WebSocket connection established');
+            // Connection indicator
+            document.getElementById('connectionStatus').classList.remove('text-danger');
+            document.getElementById('connectionStatus').classList.add('text-success');
+        };
+        
+        // Connection closed
+        chatSocket.onclose = function(e) {
+            console.log('WebSocket connection closed');
+            // Connection indicator
+            document.getElementById('connectionStatus').classList.remove('text-success');
+            document.getElementById('connectionStatus').classList.add('text-danger');
+            
+            // Try to reconnect after 5 seconds
+            setTimeout(function() {
+                connectWebSocket();
+            }, 5000);
+        };
+        
+        // Listen for messages
+        chatSocket.onmessage = function(e) {
+            const data = JSON.parse(e.data);
+            
+            if (data.type === 'message') {
+                // Add message to the chat
+                addMessageToChat(data);
+                
+                // Scroll to bottom if near bottom
+                scrollToBottomIfNeeded();
+                
+                // Mark as read if it's the latest message
+                markMessageAsRead(data.id);
+            } else if (data.type === 'history') {
+                // Clear loading indicator
+                document.getElementById('chatMessages').innerHTML = '';
+                
+                // Add historical messages
+                data.messages.forEach(function(message) {
+                    addMessageToChat(message);
+                });
+                
+                // Scroll to bottom
+                scrollToBottom();
+                
+                // Mark the last message as read
+                if (data.messages.length > 0) {
+                    const lastMessage = data.messages[data.messages.length - 1];
+                    markMessageAsRead(lastMessage.id);
+                }
+            }
+        };
+        
+        // Handle errors
+        chatSocket.onerror = function(e) {
+            console.error('WebSocket error:', e);
+        };
+    }
+    
+    // Add message to chat
+    function addMessageToChat(message) {
+        const messagesContainer = document.getElementById('chatMessages');
+        
+        // Create message element
+        const messageElement = document.createElement('div');
+        messageElement.className = 'message-item ' + (message.sender_id === currentUserId ? 'outgoing' : 'incoming');
+        messageElement.dataset.messageId = message.id;
+        
+        // Format content with mentions
+        let formattedContent = message.content;
+        if (message.mentions && message.mentions.length > 0) {
+            message.mentions.forEach(function(mention) {
+                const mentionRegex = new RegExp('@' + mention.username, 'g');
+                formattedContent = formattedContent.replace(
+                    mentionRegex,
+                    '<span class="mention-highlight">@' + mention.username + '</span>'
+                );
+            });
+        }
+        
+        // Format message timestamp
+        const timestamp = new Date(message.timestamp);
+        const formattedTime = timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        
+        // Build message HTML
+        messageElement.innerHTML = `
+            <div class="message-content">
+                ${message.sender_id !== currentUserId ? `<strong>${message.sender_name}</strong><br>` : ''}
+                ${formattedContent}
+            </div>
+            <div class="message-time text-muted">
+                ${formattedTime}
+            </div>
+        `;
+        
+        // Append message
+        messagesContainer.appendChild(messageElement);
+    }
+    
+    // Scroll to bottom of chat
+    function scrollToBottom() {
+        const messagesContainer = document.getElementById('chatMessages');
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+    
+    // Scroll to bottom only if already near bottom
+    function scrollToBottomIfNeeded() {
+        const messagesContainer = document.getElementById('chatMessages');
+        const scrollPosition = messagesContainer.scrollTop + messagesContainer.clientHeight;
+        const scrollHeight = messagesContainer.scrollHeight;
+        
+        // If we're within 300px of the bottom, scroll to bottom
+        if (scrollHeight - scrollPosition < 300) {
+            scrollToBottom();
+        }
+    }
+    
+    // Mark message as read
+    function markMessageAsRead(messageId) {
+        if (chatSocket && chatSocket.readyState === WebSocket.OPEN) {
+            chatSocket.send(JSON.stringify({
+                'type': 'read',
+                'message_id': messageId
+            }));
+        }
+    }
+    
+    // Send a message
+    function sendMessage() {
+        const messageInput = document.getElementById('messageInput');
+        const message = messageInput.value.trim();
+        
+        if (message && chatSocket && chatSocket.readyState === WebSocket.OPEN) {
+            chatSocket.send(JSON.stringify({
+                'type': 'message',
+                'message': message
+            }));
+            
+            // Clear input
+            messageInput.value = '';
+        }
+    }
+    
+    // Initialize when DOM is loaded
+    document.addEventListener('DOMContentLoaded', function() {
+        // Connect to WebSocket
+        connectWebSocket();
+        
+        // Handle form submission
+        document.getElementById('chatForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            sendMessage();
+        });
+        
+        // Add connection status indicator (hidden in UI but useful for debugging)
+        const statusIndicator = document.createElement('span');
+        statusIndicator.id = 'connectionStatus';
+        statusIndicator.className = 'text-danger';
+        statusIndicator.style.display = 'none';
+        document.body.appendChild(statusIndicator);
+    });
+</script>
+{% endif %}
+{% endblock %}
