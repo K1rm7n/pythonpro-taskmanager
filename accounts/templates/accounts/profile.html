@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}Мій профіль - TaskManager{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h3 class="card-title mb-0">Інформація про користувача</h3>
+            </div>
+            <div class="card-body text-center">
+                {% if user.profile.avatar %}
+                <img src="{{ user.profile.avatar.url }}" alt="Avatar" class="rounded-circle img-fluid mb-3" style="max-width: 150px;">
+                {% else %}
+                <img src="/static/images/default-avatar.png" alt="Default Avatar" class="rounded-circle img-fluid mb-3" style="max-width: 150px;">
+                {% endif %}
+                <h4>{{ user.get_full_name }}</h4>
+                <p class="text-muted">@{{ user.username }}</p>
+                {% if user.profile.position %}
+                <p><i class="fas fa-briefcase me-2"></i>{{ user.profile.position }}</p>
+                {% endif %}
+                {% if user.email %}
+                <p><i class="fas fa-envelope me-2"></i>{{ user.email }}</p>
+                {% endif %}
+                {% if user.profile.phone %}
+                <p><i class="fas fa-phone me-2"></i>{{ user.profile.phone }}</p>
+                {% endif %}
+                {% if user.profile.date_of_birth %}
+                <p><i class="fas fa-birthday-cake me-2"></i>{{ user.profile.date_of_birth }}</p>
+                {% endif %}
+                <p><i class="fas fa-calendar-alt me-2"></i>Приєднався: {{ user.date_joined|date:"d.m.Y" }}</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h3 class="card-title mb-0">Статистика</h3>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-6">
+                        <h4>{{ user.assigned_tasks.count }}</h4>
+                        <p class="text-muted">Завдань</p>
+                    </div>
+                    <div class="col-6">
+                        <h4>{{ user.project_set.count }}</h4>
+                        <p class="text-muted">Проектів</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h3 class="card-title mb-0">Редагування профілю</h3>
+            </div>
+            <div class="card-body">
+                <form method="post" enctype="multipart/form-data" novalidate>
+                    {% csrf_token %}
+                    
+                    <h4 class="mb-3">Основна інформація</h4>
+                    {{ user_form|crispy }}
+                    
+                    <h4 class="mt-4 mb-3">Додаткова інформація</h4>
+                    {{ profile_form|crispy }}
+                    
+                    <div class="d-grid gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary">Зберегти зміни</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
