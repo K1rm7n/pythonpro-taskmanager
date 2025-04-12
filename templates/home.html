@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+
+{% block title %}TaskManager - Система управління проектами{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center align-items-center">
+    <div class="col-lg-8 text-center">
+        <h1 class="display-4 mb-4">Вітаємо у TaskManager</h1>
+        <p class="lead mb-5">
+            Ефективна система управління проектами для вашої команди.
+            Створюйте проекти, керуйте завданнями, спілкуйтеся з командою
+            та аналізуйте результати роботи - все в одному місці.
+        </p>
+        
+        {% if not user.is_authenticated %}
+        <div class="d-grid gap-3 d-md-flex justify-content-center">
+            <a href="{% url 'account_login' %}" class="btn btn-primary btn-lg px-4">Увійти</a>
+            <a href="{% url 'account_signup' %}" class="btn btn-outline-primary btn-lg px-4">Зареєструватися</a>
+        </div>
+        {% else %}
+        <div class="d-grid gap-3 d-md-flex justify-content-center">
+            <a href="{% url 'project-list' %}" class="btn btn-primary btn-lg px-4">Мої проекти</a>
+            <a href="{% url 'project-create' %}" class="btn btn-success btn-lg px-4">Створити новий проект</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row mt-5 pt-5 gy-4">
+    <h2 class="text-center mb-4">Наші переваги</h2>
+    
+    <div class="col-md-4">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body text-center">
+                <i class="fas fa-project-diagram fa-3x text-primary mb-3"></i>
+                <h3 class="card-title">Управління проектами</h3>
+                <p class="card-text">Створюйте проекти, призначайте ролі, встановлюйте дедлайни та відстежуйте прогрес.</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body text-center">
+                <i class="fas fa-tasks fa-3x text-primary mb-3"></i>
+                <h3 class="card-title">Завдання і підзавдання</h3>
+                <p class="card-text">Розбивайте проекти на керовані завдання, призначайте виконавців та встановлюйте пріоритети.</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body text-center">
+                <i class="fas fa-comments fa-3x text-primary mb-3"></i>
+                <h3 class="card-title">Командний чат</h3>
+                <p class="card-text">Спілкуйтеся з колегами в реальному часі, обговорюйте деталі проектів та завдань.</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body text-center">
+                <i class="fas fa-chart-line fa-3x text-primary mb-3"></i>
+                <h3 class="card-title">Аналітика проектів</h3>
+                <p class="card-text">Відстежуйте показники ефективності команди та візуалізуйте прогрес за допомогою графіків.</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body text-center">
+                <i class="fas fa-file-alt fa-3x text-primary mb-3"></i>
+                <h3 class="card-title">Управління файлами</h3>
+                <p class="card-text">Зберігайте й діліться важливими документами у безпечному хмарному сховищі.</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body text-center">
+                <i class="fas fa-bell fa-3x text-primary mb-3"></i>
+                <h3 class="card-title">Сповіщення</h3>
+                <p class="card-text">Отримуйте миттєві сповіщення про оновлення завдань та важливі події у проектах.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
