@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}
+    {% if form.instance.pk %}
+        Редагування проекту - TaskManager
+    {% else %}
+        Створення проекту - TaskManager
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">
+                    {% if form.instance.pk %}
+                        <i class="fas fa-edit me-1"></i> Редагування проекту
+                    {% else %}
+                        <i class="fas fa-plus me-1"></i> Створення нового проекту
+                    {% endif %}
+                </h6>
+            </div>
+            <div class="card-body">
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    <div class="row">
+                        <div class="col-md-6">
+                            {{ form.title|as_crispy_field }}
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.status|as_crispy_field }}
+                        </div>
+                    </div>
+                    {{ form.description|as_crispy_field }}
+                    <div class="row">
+                        <div class="col-md-6">
+                            {{ form.start_date|as_crispy_field }}
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.end_date|as_crispy_field }}
+                        </div>
+                    </div>
+                    {{ form.members|as_crispy_field }}
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                        <a href="{% url 'project-list' %}" class="btn btn-secondary me-md-2">Скасувати</a>
+                        <button type="submit" class="btn btn-primary">
+                            {% if form.instance.pk %}
+                                Зберегти зміни
+                            {% else %}
+                                Створити проект
+                            {% endif %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
