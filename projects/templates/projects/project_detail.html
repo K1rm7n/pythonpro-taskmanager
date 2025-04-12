@@ -1,0 +1,345 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ project.title }} - TaskManager{% endblock %}
+
+{% block extra_css %}
+<style>
+    .task-card {
+        cursor: pointer;
+        transition: transform 0.2s;
+    }
+    .task-card:hover {
+        transform: translateY(-3px);
+    }
+    .task-column {
+        min-height: 300px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-sm-flex align-items-center justify-content-between mb-4">
+    <h1 class="h3 mb-0 text-gray-800">{{ project.title }}</h1>
+    <div>
+        <a href="{% url 'task-create' %}?project={{ project.id }}" class="btn btn-success shadow-sm me-2">
+            <i class="fas fa-plus fa-sm text-white-50 me-1"></i> Нове завдання
+        </a>
+        {% if project.owner == user %}
+        <div class="btn-group">
+            <a href="{% url 'project-update' project.id %}" class="btn btn-primary shadow-sm">
+                <i class="fas fa-edit fa-sm text-white-50 me-1"></i> Редагувати
+            </a>
+            <button type="button" class="btn btn-primary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+                <span class="visually-hidden">Toggle Dropdown</span>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+                <li><a class="dropdown-item text-danger" href="{% url 'project-delete' project.id %}">
+                    <i class="fas fa-trash fa-sm me-1"></i> Видалити проект
+                </a></li>
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Project Info Card -->
+<div class="card shadow mb-4">
+    <div class="card-header py-3 d-flex justify-content-between align-items-center">
+        <h6 class="m-0 font-weight-bold text-primary">
+            <i class="fas fa-info-circle me-1"></i> Інформація про проект
+        </h6>
+        <span class="badge 
+            {% if project.status == 'planning' %}bg-secondary{% endif %}
+            {% if project.status == 'in_progress' %}bg-primary{% endif %}
+            {% if project.status == 'on_hold' %}bg-warning{% endif %}
+            {% if project.status == 'completed' %}bg-success{% endif %}
+            {% if project.status == 'cancelled' %}bg-danger{% endif %}">
+            {{ project.get_status_display }}
+        </span>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-8">
+                <h5>Опис</h5>
+                <p>{{ project.description|linebreaks }}</p>
+                
+                <div class="row mt-4">
+                    <div class="col-md-6">
+                        <h5>Дати</h5>
+                        <p><strong>Початок:</strong> {{ project.start_date|date:"d.m.Y" }}</p>
+                        {% if project.end_date %}
+                        <p><strong>Завершення:</strong> {{ project.end_date|date:"d.m.Y" }}
+                            {% if project.is_overdue %}<span class="badge bg-danger ms-2">Прострочено</span>{% endif %}
+                        </p>
+                        {% endif %}
+                        <p><strong>Створено:</strong> {{ project.created_at|date:"d.m.Y H:i" }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h5>Прогрес проекту</h5>
+                        <div class="progress mb-2" style="height: 25px;">
+                            <div class="progress-bar progress-bar-striped 
+                                {% if project.get_progress < 25 %}bg-danger
+                                {% elif project.get_progress < 50 %}bg-warning
+                                {% elif project.get_progress < 75 %}bg-info
+                                {% else %}bg-success{% endif %}"
+                                role="progressbar" style="width: {{ project.get_progress }}%;" 
+                                aria-valuenow="{{ project.get_progress }}" aria-valuemin="0" aria-valuemax="100">
+                                {{ project.get_progress }}%
+                            </div>
+                        </div>
+                        <p class="small text-muted">Базується на кількості завершених завдань</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <h5>Команда проекту</h5>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-3">
+                            {% if project.owner.profile.avatar %}
+                            <img src="{{ project.owner.profile.avatar.url }}" alt="Avatar" class="rounded-circle me-2" width="40">
+                            {% else %}
+                            <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-2" style="width: 40px; height: 40px;">
+                                {{ project.owner.username|first|upper }}
+                            </div>
+                            {% endif %}
+                            <div>
+                                <p class="mb-0 fw-bold">{{ project.owner.get_full_name|default:project.owner.username }}</p>
+                                <small class="text-muted">Власник проекту</small>
+                            </div>
+                        </div>
+                        
+                        <hr>
+                        
+                        {% for member in project.members.all %}
+                        <div class="d-flex align-items-center mb-2">
+                            {% if member.profile.avatar %}
+                            <img src="{{ member.profile.avatar.url }}" alt="Avatar" class="rounded-circle me-2" width="30">
+                            {% else %}
+                            <div class="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center me-2" style="width: 30px; height: 30px;">
+                                {{ member.username|first|upper }}
+                            </div>
+                            {% endif %}
+                            <div>
+                                <p class="mb-0">{{ member.get_full_name|default:member.username }}</p>
+                                <small class="text-muted">{{ member.profile.position|default:"Учасник" }}</small>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <p class="text-muted small">Немає додаткових учасників</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Task Board -->
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary"><i class="fas fa-tasks me-1"></i> Дошка завдань</h6>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <!-- Todo Tasks -->
+            <div class="col-lg-3 col-md-6 mb-4">
+                <div class="card task-column">
+                    <div class="card-header bg-secondary bg-opacity-25">
+                        <h6 class="mb-0 text-secondary fw-bold">
+                            <i class="fas fa-list me-1"></i> Зробити
+                            <span class="badge bg-secondary float-end">{{ todo_tasks.count }}</span>
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        {% for task in todo_tasks %}
+                        <div class="card task-card mb-2" onclick="location.href='{% url 'task-detail' task.id %}'">
+                            <div class="card-body p-3">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="badge 
+                                        {% if task.priority == 'low' %}bg-success{% endif %}
+                                        {% if task.priority == 'medium' %}bg-info{% endif %}
+                                        {% if task.priority == 'high' %}bg-warning{% endif %}
+                                        {% if task.priority == 'urgent' %}bg-danger{% endif %}">
+                                        {{ task.get_priority_display }}
+                                    </span>
+                                    {% if task.due_date %}
+                                    <small class="text-muted">
+                                        {{ task.due_date|date:"d.m.Y" }}
+                                        {% if task.is_overdue %}<i class="fas fa-exclamation-circle text-danger ms-1"></i>{% endif %}
+                                    </small>
+                                    {% endif %}
+                                </div>
+                                <h6 class="card-title mb-1">{{ task.title }}</h6>
+                                {% if task.assignee %}
+                                <small class="d-block mb-2">
+                                    <i class="fas fa-user me-1"></i> {{ task.assignee.get_full_name|default:task.assignee.username }}
+                                </small>
+                                {% endif %}
+                                {% if task.subtasks.count > 0 %}
+                                <small class="text-muted">
+                                    <i class="fas fa-tasks me-1"></i> {{ task.subtasks.count }} підзавдань
+                                </small>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% empty %}
+                        <p class="text-muted text-center my-4">Немає завдань у цьому статусі</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- In Progress Tasks -->
+            <div class="col-lg-3 col-md-6 mb-4">
+                <div class="card task-column">
+                    <div class="card-header bg-primary bg-opacity-25">
+                        <h6 class="mb-0 text-primary fw-bold">
+                            <i class="fas fa-spinner me-1"></i> В процесі
+                            <span class="badge bg-primary float-end">{{ in_progress_tasks.count }}</span>
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        {% for task in in_progress_tasks %}
+                        <div class="card task-card mb-2" onclick="location.href='{% url 'task-detail' task.id %}'">
+                            <div class="card-body p-3">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="badge 
+                                        {% if task.priority == 'low' %}bg-success{% endif %}
+                                        {% if task.priority == 'medium' %}bg-info{% endif %}
+                                        {% if task.priority == 'high' %}bg-warning{% endif %}
+                                        {% if task.priority == 'urgent' %}bg-danger{% endif %}">
+                                        {{ task.get_priority_display }}
+                                    </span>
+                                    {% if task.due_date %}
+                                    <small class="text-muted">
+                                        {{ task.due_date|date:"d.m.Y" }}
+                                        {% if task.is_overdue %}<i class="fas fa-exclamation-circle text-danger ms-1"></i>{% endif %}
+                                    </small>
+                                    {% endif %}
+                                </div>
+                                <h6 class="card-title mb-1">{{ task.title }}</h6>
+                                {% if task.assignee %}
+                                <small class="d-block mb-2">
+                                    <i class="fas fa-user me-1"></i> {{ task.assignee.get_full_name|default:task.assignee.username }}
+                                </small>
+                                {% endif %}
+                                {% if task.subtasks.count > 0 %}
+                                <small class="text-muted">
+                                    <i class="fas fa-tasks me-1"></i> {{ task.subtasks.count }} підзавдань
+                                </small>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% empty %}
+                        <p class="text-muted text-center my-4">Немає завдань у цьому статусі</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Review Tasks -->
+            <div class="col-lg-3 col-md-6 mb-4">
+                <div class="card task-column">
+                    <div class="card-header bg-warning bg-opacity-25">
+                        <h6 class="mb-0 text-warning fw-bold">
+                            <i class="fas fa-search me-1"></i> На перевірці
+                            <span class="badge bg-warning text-dark float-end">{{ review_tasks.count }}</span>
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        {% for task in review_tasks %}
+                        <div class="card task-card mb-2" onclick="location.href='{% url 'task-detail' task.id %}'">
+                            <div class="card-body p-3">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="badge 
+                                        {% if task.priority == 'low' %}bg-success{% endif %}
+                                        {% if task.priority == 'medium' %}bg-info{% endif %}
+                                        {% if task.priority == 'high' %}bg-warning{% endif %}
+                                        {% if task.priority == 'urgent' %}bg-danger{% endif %}">
+                                        {{ task.get_priority_display }}
+                                    </span>
+                                    {% if task.due_date %}
+                                    <small class="text-muted">
+                                        {{ task.due_date|date:"d.m.Y" }}
+                                        {% if task.is_overdue %}<i class="fas fa-exclamation-circle text-danger ms-1"></i>{% endif %}
+                                    </small>
+                                    {% endif %}
+                                </div>
+                                <h6 class="card-title mb-1">{{ task.title }}</h6>
+                                {% if task.assignee %}
+                                <small class="d-block mb-2">
+                                    <i class="fas fa-user me-1"></i> {{ task.assignee.get_full_name|default:task.assignee.username }}
+                                </small>
+                                {% endif %}
+                                {% if task.subtasks.count > 0 %}
+                                <small class="text-muted">
+                                    <i class="fas fa-tasks me-1"></i> {{ task.subtasks.count }} підзавдань
+                                </small>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% empty %}
+                        <p class="text-muted text-center my-4">Немає завдань у цьому статусі</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Completed Tasks -->
+            <div class="col-lg-3 col-md-6 mb-4">
+                <div class="card task-column">
+                    <div class="card-header bg-success bg-opacity-25">
+                        <h6 class="mb-0 text-success fw-bold">
+                            <i class="fas fa-check-circle me-1"></i> Завершено
+                            <span class="badge bg-success float-end">{{ completed_tasks.count }}</span>
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        {% for task in completed_tasks %}
+                        <div class="card task-card mb-2" onclick="location.href='{% url 'task-detail' task.id %}'">
+                            <div class="card-body p-3">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="badge 
+                                        {% if task.priority == 'low' %}bg-success{% endif %}
+                                        {% if task.priority == 'medium' %}bg-info{% endif %}
+                                        {% if task.priority == 'high' %}bg-warning{% endif %}
+                                        {% if task.priority == 'urgent' %}bg-danger{% endif %}">
+                                        {{ task.get_priority_display }}
+                                    </span>
+                                    {% if task.due_date %}
+                                    <small class="text-muted">
+                                        {{ task.due_date|date:"d.m.Y" }}
+                                    </small>
+                                    {% endif %}
+                                </div>
+                                <h6 class="card-title mb-1">{{ task.title }}</h6>
+                                {% if task.assignee %}
+                                <small class="d-block mb-2">
+                                    <i class="fas fa-user me-1"></i> {{ task.assignee.get_full_name|default:task.assignee.username }}
+                                </small>
+                                {% endif %}
+                                {% if task.subtasks.count > 0 %}
+                                <small class="text-muted">
+                                    <i class="fas fa-tasks me-1"></i> {{ task.subtasks.count }} підзавдань
+                                </small>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% empty %}
+                        <p class="text-muted text-center my-4">Немає завдань у цьому статусі</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // JavaScript for interactive task cards if needed
+</script>
+{% endblock %}
