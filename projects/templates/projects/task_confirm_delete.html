@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+
+{% block title %}Видалення завдання - TaskManager{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="card shadow">
+            <div class="card-header py-3 bg-danger text-white">
+                <h6 class="m-0 font-weight-bold">
+                    <i class="fas fa-exclamation-triangle me-1"></i> Підтвердження видалення
+                </h6>
+            </div>
+            <div class="card-body text-center py-5">
+                <h4 class="mb-4">Ви впевнені, що хочете видалити завдання "{{ object.title }}"?</h4>
+                
+                {% if object.subtasks.exists %}
+                <div class="alert alert-warning mb-4">
+                    <i class="fas fa-exclamation-circle me-1"></i> 
+                    Це завдання має {{ object.subtasks.count }} підзавдань, які також будуть видалені.
+                </div>
+                {% endif %}
+                
+                <p class="text-danger mb-4">
+                    <i class="fas fa-exclamation-circle me-1"></i> 
+                    Увага! Буде видалено всі коментарі, історію та файли, пов'язані з цим завданням.
+                    <br>Цю дію неможливо буде скасувати.
+                </p>
+                
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                        <a href="{% url 'task-detail' object.id %}" class="btn btn-secondary me-md-2">
+                            <i class="fas fa-times me-1"></i> Скасувати
+                        </a>
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-trash me-1"></i> Видалити завдання
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
