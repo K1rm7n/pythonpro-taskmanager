@@ -1,0 +1,366 @@
+{% extends 'base.html' %}
+
+{% block title %}Аналітика проекту - TaskManager{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stats-card {
+        border-left: 4px solid;
+        height: 100%;
+    }
+    .stats-card-primary {
+        border-color: var(--bs-primary);
+    }
+    .stats-card-success {
+        border-color: var(--bs-success);
+    }
+    .stats-card-warning {
+        border-color: var(--bs-warning);
+    }
+    .stats-card-info {
+        border-color: var(--bs-info);
+    }
+    .chart-container {
+        position: relative;
+        height: 300px;
+        margin-bottom: 20px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-sm-flex align-items-center justify-content-between mb-4">
+    <h1 class="h3 mb-0 text-gray-800">Аналітика проекту</h1>
+</div>
+
+<!-- Project selection -->
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Вибір проекту</h6>
+    </div>
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-6">
+                <label for="project" class="form-label">Проект</label>
+                <select name="project" id="project" class="form-select">
+                    {% for project in projects %}
+                    <option value="{{ project.id }}" {% if selected_project.id == project.id %}selected{% endif %}>
+                        {{ project.title }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary">Застосувати</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if selected_project %}
+<!-- Stats Overview -->
+<div class="row mb-4">
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card shadow stats-card stats-card-primary h-100">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-3 text-center text-primary">
+                        <i class="fas fa-tasks fa-3x"></i>
+                    </div>
+                    <div class="col-9">
+                        <div class="text-xs font-weight-bold text-uppercase mb-1">Всього завдань</div>
+                        <div class="h5 mb-0 font-weight-bold">{{ total_tasks }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card shadow stats-card stats-card-success h-100">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-3 text-center text-success">
+                        <i class="fas fa-check-circle fa-3x"></i>
+                    </div>
+                    <div class="col-9">
+                        <div class="text-xs font-weight-bold text-uppercase mb-1">Завершено</div>
+                        <div class="h5 mb-0 font-weight-bold">{{ completed_tasks }}</div>
+                        {% if total_tasks > 0 %}
+                        <div class="text-muted small mt-1">{{ completed_tasks|floatformat:0 }}% від загальної кількості</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card shadow stats-card stats-card-warning h-100">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-3 text-center text-warning">
+                        <i class="fas fa-exclamation-circle fa-3x"></i>
+                    </div>
+                    <div class="col-9">
+                        <div class="text-xs font-weight-bold text-uppercase mb-1">Прострочено</div>
+                        <div class="h5 mb-0 font-weight-bold">{{ overdue_tasks }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card shadow stats-card stats-card-info h-100">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-3 text-center text-info">
+                        <i class="fas fa-clock fa-3x"></i>
+                    </div>
+                    <div class="col-9">
+                        <div class="text-xs font-weight-bold text-uppercase mb-1">Сер. час виконання</div>
+                        <div class="h5 mb-0 font-weight-bold">{{ avg_completion_time }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Task Status Chart -->
+<div class="row mb-4">
+    <div class="col-xl-6 col-lg-6">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Розподіл за статусом</h6>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="taskStatusChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-6 col-lg-6">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Розподіл за пріоритетом</h6>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="taskPriorityChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Progress Charts -->
+<div class="row mb-4">
+    <div class="col-xl-8 col-lg-7">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Завершення завдань за останні 30 днів</h6>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="completionChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-4 col-lg-5">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Внесок учасників</h6>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="contributionChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Project Progress -->
+<div class="row">
+    <div class="col-lg-12">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Загальний прогрес проекту</h6>
+            </div>
+            <div class="card-body">
+                <h4 class="small font-weight-bold">Прогрес <span class="float-end">{{ selected_project.get_progress }}%</span></h4>
+                <div class="progress mb-4">
+                    <div class="progress-bar 
+                        {% if selected_project.get_progress < 25 %}bg-danger
+                        {% elif selected_project.get_progress < 50 %}bg-warning
+                        {% elif selected_project.get_progress < 75 %}bg-info
+                        {% else %}bg-success{% endif %}" 
+                        role="progressbar" style="width: {{ selected_project.get_progress }}%" 
+                        aria-valuenow="{{ selected_project.get_progress }}" aria-valuemin="0" aria-valuemax="100">
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-lg-6">
+                        <p>
+                            <strong>Початок:</strong> {{ selected_project.start_date|date:"d.m.Y" }}<br>
+                            {% if selected_project.end_date %}
+                            <strong>Завершення:</strong> {{ selected_project.end_date|date:"d.m.Y" }}
+                            {% if selected_project.is_overdue %}<span class="badge bg-danger ms-2">Прострочено</span>{% endif %}
+                            {% else %}
+                            <strong>Завершення:</strong> Не вказано
+                            {% endif %}
+                        </p>
+                    </div>
+                    <div class="col-lg-6">
+                        <p>
+                            <strong>Власник:</strong> {{ selected_project.owner.get_full_name|default:selected_project.owner.username }}<br>
+                            <strong>Учасників:</strong> {{ selected_project.members.count|add:1 }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% else %}
+<div class="card shadow mb-4">
+    <div class="card-body">
+        <div class="text-center py-5">
+            <i class="fas fa-chart-area fa-4x text-gray-300 mb-4"></i>
+            <h4>Немає доступних проектів для аналізу</h4>
+            <p>Створіть новий проект або долучіться до існуючого, щоб почати відстежувати прогрес</p>
+            <a href="{% url 'project-create' %}" class="btn btn-primary mt-3">Створити проект</a>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{% if selected_project %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    // Task Status Chart
+    const statusCtx = document.getElementById('taskStatusChart').getContext('2d');
+    const statusChart = new Chart(statusCtx, {
+        type: 'doughnut',
+        data: {
+            labels: {{ task_status_labels|safe }},
+            datasets: [{
+                data: {{ task_status_data|safe }},
+                backgroundColor: {{ task_status_colors|safe }},
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'right',
+                }
+            }
+        }
+    });
+    
+    // Task Priority Chart
+    const priorityCtx = document.getElementById('taskPriorityChart').getContext('2d');
+    const priorityChart = new Chart(priorityCtx, {
+        type: 'doughnut',
+        data: {
+            labels: {{ task_priority_labels|safe }},
+            datasets: [{
+                data: {{ task_priority_data|safe }},
+                backgroundColor: {{ task_priority_colors|safe }},
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'right',
+                }
+            }
+        }
+    });
+    
+    // Completion Chart
+    const completionCtx = document.getElementById('completionChart').getContext('2d');
+    const completionChart = new Chart(completionCtx, {
+        type: 'line',
+        data: {
+            labels: {{ completion_dates|safe }},
+            datasets: [{
+                label: 'Завершені завдання',
+                data: {{ completion_counts|safe }},
+                borderColor: '#4e73df',
+                backgroundColor: 'rgba(78, 115, 223, 0.05)',
+                borderWidth: 2,
+                fill: true,
+                tension: 0.1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    grid: {
+                        display: false
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        precision: 0
+                    }
+                }
+            }
+        }
+    });
+    
+    // Contribution Chart
+    const contributionCtx = document.getElementById('contributionChart').getContext('2d');
+    const contributionChart = new Chart(contributionCtx, {
+        type: 'bar',
+        data: {
+            labels: {{ contribution_labels|safe }},
+            datasets: [{
+                label: 'Завершені завдання',
+                data: {{ contribution_data|safe }},
+                backgroundColor: {{ contribution_colors|safe }},
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    grid: {
+                        display: false
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        precision: 0
+                    }
+                }
+            }
+        }
+    });
+</script>
+{% endif %}
+{% endblock %}
