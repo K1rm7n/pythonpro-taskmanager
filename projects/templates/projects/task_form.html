@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}
+    {% if form.instance.pk %}
+        Редагування завдання - TaskManager
+    {% else %}
+        Створення завдання - TaskManager
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">
+                    {% if form.instance.pk %}
+                        <i class="fas fa-edit me-1"></i> Редагування завдання
+                    {% else %}
+                        <i class="fas fa-plus me-1"></i> Створення нового завдання
+                    {% endif %}
+                </h6>
+            </div>
+            <div class="card-body">
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    <div class="row">
+                        <div class="col-md-8">
+                            {{ form.title|as_crispy_field }}
+                        </div>
+                        <div class="col-md-4">
+                            {{ form.priority|as_crispy_field }}
+                        </div>
+                    </div>
+                    
+                    {{ form.description|as_crispy_field }}
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            {{ form.project|as_crispy_field }}
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.assignee|as_crispy_field }}
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-4">
+                            {{ form.status|as_crispy_field }}
+                        </div>
+                        <div class="col-md-4">
+                            {{ form.due_date|as_crispy_field }}
+                        </div>
+                        <div class="col-md-4">
+                            {{ form.estimated_hours|as_crispy_field }}
+                        </div>
+                    </div>
+                    
+                    {{ form.parent_task|as_crispy_field }}
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                        {% if form.instance.pk %}
+                            <a href="{% url 'task-detail' form.instance.pk %}" class="btn btn-secondary me-md-2">Скасувати</a>
+                        {% else %}
+                            <a href="{% url 'task-list' %}" class="btn btn-secondary me-md-2">Скасувати</a>
+                        {% endif %}
+                        <button type="submit" class="btn btn-primary">
+                            {% if form.instance.pk %}
+                                Зберегти зміни
+                            {% else %}
+                                Створити завдання
+                            {% endif %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
